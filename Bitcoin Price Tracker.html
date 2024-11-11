@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NetRise Bitcoin Tracker</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #1E2A47;
+            color: white;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+            header h1 {
+                font-size: 36px;
+                font-weight: bold;
+            }
+
+        #price-card {
+            background-color: #2C3E50;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 40px;
+            border: 1px solid #34495E;
+        }
+
+            #price-card p {
+                font-size: 18px;
+                margin: 0;
+            }
+
+        button {
+            background-color: #C0392B;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            font-size: 18px;
+            cursor: pointer;
+            display: block;
+            margin: 0 auto;
+        }
+
+            button:hover {
+                background-color: #E74C3C;
+            }
+
+        .chart-container {
+            position: relative;
+            height: 400px;
+        }
+
+        #bitcoinChart {
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <header>
+            <h1>NetRise Bitcoin Tracker</h1>
+        </header>
+
+        <div id="price-card">
+            <p id="price-display">Loading prices...</p>
+        </div>
+
+        <button onclick="startTracker()">Start Tracker</button>
+
+        <div class="chart-container">
+            <canvas id="bitcoinChart"></canvas>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        const countries = {
+            'USA': 'usd',
+            'Canada': 'cad',
+            'UK': 'gbp',
+            'Germany': 'eur',
+            'Australia': 'aud',
+            'Japan': 'jpy',
+            'India': 'inr',
+            'China': 'cny',
+            'Brazil': 'brl',
+            'Switzerland': 'chf',
+            'South Korea': 'krw',
+            'Mexico': 'mxn',
+            'Jordan': 'jod',
+            'Saudi Arabia': 'sar',
+            'UAE': 'aed',
+            'Kuwait': 'kwd',
+            'Qatar': 'qar',
+            'Bahrain': 'bhd',
+            'Lebanon': 'lbp',
+            'Oman': 'omr',
+            'Iraq': 'iqd',
+            'Algeria': 'dzd',
+            'Tunisia': 'tnd',
+            'Egypt': 'egp'
+        };
+
+        const historicalPrices = [];
+        const currencyKeys = Object.values(countries);
+        const priceDisplay = document.getElementById("price-display");
+        const bitcoinChartElement = document.getElementById("bitcoinChart");
+        let chartInstance;
+
+        // Fallback currency (USD) in case a currency is unsupported
+        const fallbackCurrency = 'usd';
+
+        async function getBitcoinPrice(currencies) {
+            const url = `https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=${currencies.join(',')}`;
+            const response = await fetch(url);
+            if (response.ok) {
+                return response.json();
+            } else {
+                console.error('Error fetching Bitcoin prices');
+                return null;
+            }
+        }
+
+        function updatePrices() {
+            getBitcoinPrice(currencyKeys).then(prices => {
+                if (prices) {
+                    const currentTime = new Date().toLocaleTimeString();
+                    let displayText = "";
+                    const validCountries = Object.keys(countries).filter(country => {
+                        const currency = countries[country];
+                        return prices.bitcoin[currency] !== undefined;
+                    });
+
+                    validCountries.forEach((country) => {
+                        const currency = countries[country];
+                        const price = prices.bitcoin[currency];
+                        displayText += `${country}: ${price} ${currency.toUpperCase()}<br>`;
+                        historicalPrices.push({ time: currentTime, price: price });
+                    });
+
+                    priceDisplay.innerHTML = displayText;
+                    updateChart();
+                }
+            });
+        }
+
+        function startTracker() {
+            updatePrices(); // Initial update
+            setInterval(updatePrices, 5000); // Update every 5 seconds
+        }
+
+        function updateChart() {
+            if (historicalPrices.length > 0) {
+                const times = historicalPrices.map(item => item.time);
+                const prices = historicalPrices.map(item => item.price);
+
+                if (!chartInstance) {
+                    chartInstance = new Chart(bitcoinChartElement, {
+                        type: 'line',
+                        data: {
+                            labels: times,
+                            datasets: [{
+                                label: 'Bitcoin Price (USD)',
+                                data: prices,
+                                borderColor: 'dodgerblue',
+                                fill: false,
+                                lineTension: 0.1,
+                                borderWidth: 3
+                            }]
+                        },
+                        options: {
+                            scales: {
+                                x: {
+                                    type: 'category',
+                                    title: {
+                                        display: true,
+                                        text: 'Time',
+                                        font: {
+                                            size: 14
+                                        }
+                                    },
+                                    ticks: {
+                                        font: {
+                                            size: 12
+                                        }
+                                    }
+                                },
+                                y: {
+                                    title: {
+                                        display: true,
+                                        text: 'Price (USD)',
+                                        font: {
+                                            size: 14
+                                        }
+                                    },
+                                    ticks: {
+                                        font: {
+                                            size: 12
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                } else {
+                    chartInstance.data.labels = times;
+                    chartInstance.data.datasets[0].data = prices;
+                    chartInstance.update();
+                }
+            }
+        }
+    </script>
+</body>
+</html>
